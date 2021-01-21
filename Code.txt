@@ -1,0 +1,134 @@
+;0-7F
+;80-FF
+
+MVI A, 0
+MVI E, 0
+; E: If we find a number greater than 7F,
+; we increase E by 1. In this way,
+; we will not control values less than 80.
+STA 0000H ; We reset at the beginning.
+LXI H, 0001H
+MVI D, 80H ; FF-80 = 0111 1111
+MOV A, M
+JMP PRINT2
+
+PRINT: INX H
+MOV A, M
+
+PRINT2: MVI B, 0
+ADD B ; Or SUB B
+JZ END ; If the value entered is 0, it ends.
+SUB D ; A = A - D 
+JP BIGTHAN7F ; If the sign bit is not 1, it continues.
+ADD D ; If the number is less than 80.
+MOV C, A
+MOV A, E
+ADD B ; Or SUB B
+JNZ PRINT ; If not 0, go.
+; If a number greater than 7F has been previously
+; processed, subsequent numbers
+; less than 80 are not processed.
+LDA 0000H
+SUB C ; A = A - C
+JP PRINT ; If the sign bit is not 1.
+MOV A, M
+STA 0000H
+JMP PRINT
+
+BIGTHAN7F: ADD D ; Values greater than 7F.
+CMA ; Take the complement.
+MOV C, A
+MOV A, E
+ADD B
+JZ CHANGE
+LDA 0000H
+CMA
+SUB C ; A = A - C
+JM PRINT ; If the sign bit is 1, return to top.
+
+CHANGE: CMA
+MOV A, M
+STA 0000H
+INR E ; It is enough to increase 1.
+JMP PRINT
+
+END: MVI H, 10D ; Convert to decimal.
+MVI L, 0
+MVI B, 0
+MVI C, 0
+MOV A, E
+SUB B
+JNZ BIG2 ; If the result is greater than 7F.
+JMP END2
+
+BIG2: LDA 0000H
+SUB D ; Subtracts 128 from the maximum
+; value in decimal base.
+STA 0000H
+
+END2: LDA 0000H ; Set the digits of the number.
+MVI D, 0
+SUB H
+JM FINISH
+STA 0000H
+MOV A, B
+INR A
+MOV B, A
+JMP END2
+
+FINISH: ADD H
+MOV C, A
+; The units digit of the number has been determined.
+MOV A, B
+
+HUND: SUB H
+JM INTERVAL
+MOV B, A; Tens digit 
+INR D ; Hundreds digit
+JMP HUND
+
+INTERVAL: MOV A, E
+SUB L
+JNZ INCREASE
+JMP LAST ; If the maximum number is less than 7F,
+; the program ends.
+
+INCREASE: MOV A, C
+ADI 8
+MOV C, A
+MOV A, B
+ADI 2
+MOV B, A
+MOV A, D
+ADI 1
+MOV D, A
+
+; Finishing Touches
+; If the maximum value found is greater than 7F, when
+; 128 is added to the result in decimal, the section
+; that corrects that part if the accumulation (hand)
+; occurs in the ones and tens step.
+RETOUCH: MOV A, C
+SUB H
+JM RETOUCH2
+MOV C, A
+MOV A, B
+INR A
+MOV B, A
+JMP RETOUCH
+
+RETOUCH2: ADD H
+MOV C, A
+MOV A, B
+
+RETOUCH3: SUB H
+JM LAST
+MOV B, A
+INR D
+JMP RETOUCH3
+
+LAST: HLT
+
+; The hundreds digit of the largest number is
+; written to the D register, the tens digit to the
+; C register, the ones digit to the B register.
